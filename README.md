@@ -1,17 +1,18 @@
 # Task Tracking REST API
 
-A RESTful API for managing users, projects, and tasks, built with Spring Boot. Supports full CRUD operations, validation, pagination, filtering, and centralized exception handling.
+A RESTful API for managing users, projects, and tasks, built with Spring Boot. Supports full CRUD operations, validation, pagination, filtering, centralized exception handling, authentication, email notifications, and dynamic search.
 
 ## Technologies
 
 - **Java 21**
-- **Spring Boot 4.1.0** (Spring Web MVC, Spring Data JPA)
+- **Spring Boot 4.1.0** (Spring Web MVC, Spring Data JPA, Spring Security, Spring Mail)
 - **H2** in-memory database
 - **Flyway** for database migrations
 - **springdoc-openapi** (Swagger UI) for API documentation
 - **JUnit 5, Mockito** for testing
 - **Maven** for build management
 - **Lombok** for boilerplate reduction
+- **Axios** (frontend) for API communication
 
 ## Prerequisites
 
@@ -26,27 +27,56 @@ A RESTful API for managing users, projects, and tasks, built with Spring Boot. S
    cd task-tracking
    ```
 
-2. Run the application:
+2. (For email notifications) Configure SMTP credentials in `src/main/resources/application.properties`:
+   ```
+   spring.mail.username=your_email@gmail.com
+   spring.mail.password=your_app_password
+   ```
+   Use a Gmail App Password (not your account password).
+
+3. Run the application:
    ```
    ./mvnw spring-boot:run
    ```
    (On Windows: `mvnw spring-boot:run`)
 
-3. The application starts on `http://localhost:8080`.
+4. The application starts on `http://localhost:8080`.
 
-The H2 in-memory database is created automatically on startup, and Flyway applies the schema migrations. Note: data is reset on each restart (in-memory database).
+On startup, Flyway applies the schema migrations and a data seeder creates an initial user for login.
+
+## Frontend Dashboard
+
+A dashboard built with HTML, CSS, and JavaScript (Axios) is served at:
+
+```
+http://localhost:8080/
+```
+
+Features: login screen, sidebar navigation, statistics cards, user/project/task management with create/edit/delete, task filtering by status, task search, and client-side form validation.
+
+**Default login credentials (seeded):**
+- Username: `joan`
+- Password: `joan12345`
+
+## Authentication
+
+The API uses **HTTP Basic Authentication** (Spring Security). Passwords are hashed with BCrypt.
+
+- `POST /api/users` (registration) is open without authentication.
+- Swagger UI and the H2 console are accessible without authentication.
+- All other endpoints require valid credentials.
+
+To authenticate in Swagger UI, click "Authorize" and enter your username and password.
 
 ## API Documentation
 
-Interactive API documentation is available via Swagger UI once the application is running:
+Interactive API documentation via Swagger UI:
 
 ```
 http://localhost:8080/swagger-ui.html
 ```
 
 ## H2 Database Console
-
-The H2 console is available at:
 
 ```
 http://localhost:8080/h2-console
@@ -59,14 +89,12 @@ Connection settings:
 
 ## Database Schema
 
-The schema consists of three tables with the following relationships:
-
 ```
 users
   - id (PK)
-  - username
+  - username (unique)
   - email
-  - password
+  - password (BCrypt hashed)
   - created_at
 
 projects
@@ -98,41 +126,49 @@ tasks
 ## API Endpoints
 
 ### Users
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/users` | Create a user |
-| GET | `/api/users/{id}` | Get a user by ID |
-| GET | `/api/users` | Get all users (paginated) |
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/users` | Create a user (registration) | No |
+| GET | `/api/users/{id}` | Get a user by ID | Yes |
+| GET | `/api/users` | Get all users (paginated) | Yes |
 
 ### Projects
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/projects` | Create a project |
-| GET | `/api/projects/{id}` | Get a project by ID |
-| GET | `/api/projects` | Get all projects (paginated) |
-| PUT | `/api/projects/{id}` | Update a project |
-| DELETE | `/api/projects/{id}` | Delete a project |
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/projects` | Create a project | Yes |
+| GET | `/api/projects/{id}` | Get a project by ID | Yes |
+| GET | `/api/projects` | Get all projects (paginated) | Yes |
+| PUT | `/api/projects/{id}` | Update a project | Yes |
+| DELETE | `/api/projects/{id}` | Delete a project | Yes |
 
 ### Tasks
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/projects/{projectId}/tasks` | Create a task in a project |
-| GET | `/api/tasks/{id}` | Get a task by ID |
-| GET | `/api/projects/{projectId}/tasks` | Get tasks of a project (paginated, filter by `?status=`) |
-| PUT | `/api/tasks/{id}` | Update a task |
-| DELETE | `/api/tasks/{id}` | Delete a task |
-| GET | `/api/tasks/due-today` | Get tasks due today |
-| GET | `/api/users/{userId}/tasks` | Get tasks assigned to a user |
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/projects/{projectId}/tasks` | Create a task in a project | Yes |
+| GET | `/api/tasks/{id}` | Get a task by ID | Yes |
+| GET | `/api/projects/{projectId}/tasks` | Get tasks of a project (paginated, filter by `?status=`) | Yes |
+| PUT | `/api/tasks/{id}` | Update a task | Yes |
+| DELETE | `/api/tasks/{id}` | Delete a task | Yes |
+| GET | `/api/tasks/due-today` | Get tasks due today | Yes |
+| GET | `/api/users/{userId}/tasks` | Get tasks assigned to a user | Yes |
+| GET | `/api/tasks/search` | Search tasks (filter by `?title=`, `?status=`, `?priority=`) | Yes |
+
+## Optional Features Implemented
+
+1. **Authentication** — HTTP Basic Authentication with Spring Security and BCrypt password hashing.
+2. **Email notifications** — when a task is assigned to a user, an email notification is sent via Spring Mail.
+3. **Task search** — dynamic search using Spring Data JPA Specifications, filtering by any combination of title, status, and priority.
 
 ## Validation
 
-Request bodies are validated using Jakarta Bean Validation annotations. Invalid input returns a `400 Bad Request` with field-specific error messages.
+Request bodies are validated using Jakarta Bean Validation annotations. Invalid input returns a `400 Bad Request` with field-specific error messages. The frontend also performs client-side validation.
 
 ## Error Handling
 
 Centralized exception handling via `@RestControllerAdvice` returns clean, structured error responses:
 - `404 Not Found` — when a requested resource does not exist
 - `400 Bad Request` — when validation fails
+- `401 Unauthorized` — when authentication is missing or invalid
 - `500 Internal Server Error` — for unexpected errors
 
 Example error response:
@@ -147,7 +183,7 @@ Example error response:
 
 ## Testing
 
-The project includes three types of automated tests:
+Three types of automated tests:
 - **Service layer (unit tests):** JUnit 5 + Mockito, mocking the repository layer
 - **Repository layer:** `@DataJpaTest` with an embedded test database
 - **Controller layer (integration tests):** `@WebMvcTest` with MockMvc
@@ -159,7 +195,8 @@ Run all tests with:
 
 ## Assumptions
 
-- Passwords are stored as provided (no hashing in the base version).
-- The in-memory database resets on each restart; data does not persist.
+- The in-memory database resets on each restart; data does not persist between runs.
+- A data seeder creates an initial user (`joan`) on startup for immediate login.
 - A task's assignee is optional; a task may exist without an assigned user.
 - Pagination uses Spring Data's default page size (20) unless `?page` and `?size` query parameters are provided.
+- Passwords are hashed with BCrypt before being stored.
