@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Tracking Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef1f7; color: #1a1a2e; }
+        #loginPage { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #4a6cf7 0%, #6a3cf7 100%); }
+        .login-card { background: white; padding: 44px; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.2); width: 380px; }
+        .login-card h1 { text-align: center; margin-bottom: 6px; color: #4a6cf7; }
+        .login-card p { text-align: center; color: #999; margin-bottom: 28px; font-size: 14px; }
+        input, select { width: 100%; padding: 12px 14px; margin: 8px 0; border: 1px solid #e0e0e0; border-radius: 10px; font-size: 14px; transition: border 0.2s; }
+        input:focus, select:focus { outline: none; border-color: #4a6cf7; box-shadow: 0 0 0 3px rgba(74,108,247,0.1); }
+        input.invalid { border-color: #e74c3c; background: #fff5f5; }
+        button { padding: 12px 18px; border: none; border-radius: 10px; background: #4a6cf7; color: white; font-weight: 600; cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        button:hover { background: #3a5ce7; transform: translateY(-1px); }
+        .btn-full { width: 100%; margin-top: 10px; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; width: auto; }
+        .btn-danger { background: #e74c3c; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-edit { background: #f39c12; }
+        .btn-edit:hover { background: #d68910; }
+        #appPage { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 28px 0; position: fixed; height: 100vh; }
+        .sidebar h2 { padding: 0 28px 28px; color: #4a6cf7; font-size: 22px; }
+        .nav-item { padding: 14px 28px; cursor: pointer; transition: all 0.2s; border-left: 3px solid transparent; font-size: 15px; }
+        .nav-item:hover { background: rgba(74,108,247,0.15); }
+        .nav-item.active { background: rgba(74,108,247,0.2); border-left-color: #4a6cf7; }
+        .sidebar .logout-area { position: absolute; bottom: 28px; width: 100%; padding: 0 28px; }
+        .sidebar .logout-area button { width: 100%; background: #e74c3c; }
+        .main { margin-left: 250px; padding: 36px; flex: 1; }
+        .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }
+        .topbar h1 { color: #1a1a2e; font-size: 28px; }
+        .user-badge { background: white; padding: 10px 18px; border-radius: 24px; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-weight: 600; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-bottom: 32px; }
+        .stat-card { background: white; padding: 28px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border-left: 4px solid #4a6cf7; }
+        .stat-card .num { font-size: 40px; font-weight: 700; color: #4a6cf7; }
+        .stat-card .label { color: #999; margin-top: 6px; font-size: 14px; }
+        .section { display: none; }
+        .section.active { display: block; animation: fade 0.3s; }
+        @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .card { background: white; padding: 28px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 24px; }
+        .card h3 { margin-bottom: 18px; color: #2c3e50; font-size: 18px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 14px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+        th { background: #f8f9fc; font-weight: 600; color: #666; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+        tr:hover { background: #fafbff; }
+        .actions { display: flex; gap: 6px; }
+        .row { display: flex; gap: 14px; }
+        .row > * { flex: 1; }
+        .badge { padding: 5px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; }
+        .badge-todo { background: #e3f2fd; color: #1976d2; }
+        .badge-progress { background: #fff3e0; color: #f57c00; }
+        .badge-completed { background: #e8f5e9; color: #388e3c; }
+        .badge-low { background: #f1f8e9; color: #689f38; }
+        .badge-medium { background: #fff8e1; color: #f9a825; }
+        .badge-high { background: #ffebee; color: #d32f2f; }
+        .msg { padding: 11px 14px; border-radius: 10px; margin-top: 12px; font-size: 13px; }
+        .msg-success { background: #e8f5e9; color: #388e3c; }
+        .msg-error { background: #ffebee; color: #d32f2f; }
+        .empty { text-align: center; color: #bbb; padding: 24px; }
+        .field-error { color: #e74c3c; font-size: 12px; margin: 2px 0 6px; display: none; }
+        .field-error.show { display: block; }
+        .filter-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+        .filter-bar select, .filter-bar input { margin: 0; }
+        .modal-bg { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+        .modal-bg.show { display: flex; }
+        .modal { background: white; padding: 32px; border-radius: 16px; width: 440px; max-width: 90%; }
+        .modal h3 { margin-bottom: 18px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 14px; }
+        .btn-secondary { background: #95a5a6; }
+        .btn-secondary:hover { background: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+<div id="loginPage">
+    <div class="login-card">
+        <h1>Task Tracking</h1>
+        <p>Identifikohu per te vazhduar</p>
+        <input id="loginUsername" placeholder="Username">
+        <input id="loginPassword" type="password" placeholder="Password">
+        <button class="btn-full" onclick="login()">Login</button>
+        <div id="loginMsg"></div>
+    </div>
+</div>
+
+<div id="appPage" style="display:none;">
+    <div class="sidebar">
+        <h2>TaskTracker</h2>
+        <div class="nav-item active" onclick="showSection('dashboard', this)">Dashboard</div>
+        <div class="nav-item" onclick="showSection('users', this)">Users</div>
+        <div class="nav-item" onclick="showSection('projects', this)">Projects</div>
+        <div class="nav-item" onclick="showSection('tasks', this)">Tasks</div>
+        <div class="nav-item" onclick="showSection('search', this)">Search</div>
+        <div class="logout-area"><button onclick="logout()">Dil</button></div>
+    </div>
+
+    <div class="main">
+        <div class="topbar">
+            <h1 id="sectionTitle">Dashboard</h1>
+            <span class="user-badge" id="userBadge">user</span>
+        </div>
+
+        <div id="dashboard" class="section active">
+            <div class="stats">
+                <div class="stat-card"><div class="num" id="statUsers">-</div><div class="label">Users</div></div>
+                <div class="stat-card"><div class="num" id="statProjects">-</div><div class="label">Projects</div></div>
+                <div class="stat-card"><div class="num" id="statTasks">-</div><div class="label">Tasks (sot)</div></div>
+            </div>
+            <div class="card"><h3>Tasks qe skadojne sot</h3><div id="dueTodayTable"></div></div>
+        </div>
+
+        <div id="users" class="section">
+            <div class="card">
+                <h3>Krijo User</h3>
+                <div class="row">
+                    <div><input id="newUsername" placeholder="Username"><div class="field-error" id="err-newUsername"></div></div>
+                    <div><input id="newEmail" placeholder="Email"><div class="field-error" id="err-newEmail"></div></div>
+                    <div><input id="newPassword" type="password" placeholder="Password"><div class="field-error" id="err-newPassword"></div></div>
+                </div>
+                <button onclick="createUser()">Krijo</button>
+                <div id="userMsg"></div>
+            </div>
+            <div class="card"><h3>Lista e Users</h3><div id="usersTable"></div></div>
+        </div>
+
+        <div id="projects" class="section">
+            <div class="card">
+                <h3>Krijo Projekt</h3>
+                <div class="row">
+                    <div><input id="projectName" placeholder="Emri"><div class="field-error" id="err-projectName"></div></div>
+                    <div><input id="projectDesc" placeholder="Pershkrimi"></div>
+                    <div><input id="projectOwnerId" type="number" placeholder="Owner ID"><div class="field-error" id="err-projectOwnerId"></div></div>
+                </div>
+                <button onclick="createProject()">Krijo</button>
+                <div id="projectMsg"></div>
+            </div>
+            <div class="card"><h3>Lista e Projekteve</h3><div id="projectsTable"></div></div>
+        </div>
+
+        <div id="tasks" class="section">
+            <div class="card">
+                <h3>Krijo Task</h3>
+                <div class="row">
+                    <div><input id="taskProjectId" type="number" placeholder="Project ID"><div class="field-error" id="err-taskProjectId"></div></div>
+                    <div><input id="taskTitle" placeholder="Titulli"><div class="field-error" id="err-taskTitle"></div></div>
+                </div>
+                <input id="taskDesc" placeholder="Pershkrimi">
+                <div class="row">
+                    <select id="taskStatus"><option value="TODO">TODO</option><option value="IN_PROGRESS">IN_PROGRESS</option><option value="COMPLETED">COMPLETED</option></select>
+                    <select id="taskPriority"><option value="LOW">LOW</option><option value="MEDIUM">MEDIUM</option><option value="HIGH">HIGH</option></select>
+                </div>
+                <div class="row">
+                    <input id="taskDueDate" type="date">
+                    <input id="taskAssigneeId" type="number" placeholder="Assignee ID (opsionale)">
+                </div>
+                <button onclick="createTask()">Krijo</button>
+                <div id="taskMsg"></div>
+            </div>
+            <div class="card">
+                <h3>Tasks sipas Projektit</h3>
+                <div class="filter-bar">
+                    <input id="loadTaskProjectId" type="number" placeholder="Project ID" style="max-width:160px;">
+                    <select id="filterStatus" style="max-width:200px;">
+                        <option value="">Te gjitha statuset</option>
+                        <option value="TODO">TODO</option>
+                        <option value="IN_PROGRESS">IN_PROGRESS</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                    </select>
+                    <button onclick="loadTasksByProject()">Ngarko / Filtro</button>
+                </div>
+                <div id="tasksTable"></div>
+            </div>
+        </div>
+
+        <div id="search" class="section">
+            <div class="card">
+                <h3>Kerko Tasks</h3>
+                <div class="row">
+                    <input id="searchTitle" placeholder="Titulli (permban...)">
+                    <select id="searchStatus">
+                        <option value="">Te gjitha statuset</option>
+                        <option value="TODO">TODO</option>
+                        <option value="IN_PROGRESS">IN_PROGRESS</option>
+                        <option value="COMPLETED">COMPLETED</option>
+                    </select>
+                    <select id="searchPriority">
+                        <option value="">Te gjitha prioritetet</option>
+                        <option value="LOW">LOW</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="HIGH">HIGH</option>
+                    </select>
+                </div>
+                <button onclick="searchTasks()">Kerko</button>
+                <div id="searchResultInfo" style="margin-top:12px; color:#999; font-size:13px;"></div>
+            </div>
+            <div class="card"><h3>Rezultatet</h3><div id="searchTable"></div></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-bg" id="editModal">
+    <div class="modal">
+        <h3>Edito Task</h3>
+        <input type="hidden" id="editTaskId">
+        <input id="editTitle" placeholder="Titulli">
+        <div class="field-error" id="err-editTitle"></div>
+        <input id="editDesc" placeholder="Pershkrimi">
+        <div class="row">
+            <select id="editStatus"><option value="TODO">TODO</option><option value="IN_PROGRESS">IN_PROGRESS</option><option value="COMPLETED">COMPLETED</option></select>
+            <select id="editPriority"><option value="LOW">LOW</option><option value="MEDIUM">MEDIUM</option><option value="HIGH">HIGH</option></select>
+        </div>
+        <div class="row">
+            <input id="editDueDate" type="date">
+            <input id="editAssigneeId" type="number" placeholder="Assignee ID (opsionale)">
+        </div>
+        <div class="modal-actions">
+            <button onclick="saveTaskEdit()">Ruaj</button>
+            <button class="btn-secondary" onclick="closeEditModal()">Anulo</button>
+        </div>
+        <div id="editMsg"></div>
+    </div>
+</div>
+
+<script>
+    const API = "http://localhost:8080/api";
+    let authHeader = null;
+    let currentProjectId = null;
+
+    function config() { return { headers: { Authorization: authHeader } }; }
+
+    async function login() {
+        const username = document.getElementById("loginUsername").value;
+        const password = document.getElementById("loginPassword").value;
+        if (!username || !password) { showMsg("loginMsg", "Ploteso username dhe password", false); return; }
+        authHeader = "Basic " + btoa(username + ":" + password);
+        try {
+            await axios.get(API + "/users", config());
+            document.getElementById("loginPage").style.display = "none";
+            document.getElementById("appPage").style.display = "flex";
+            document.getElementById("userBadge").textContent = username;
+            loadDashboard();
+        } catch (err) {
+            authHeader = null;
+            showMsg("loginMsg", "Login deshtoi: kredenciale te gabuara", false);
+        }
+    }
+
+    function logout() {
+        authHeader = null;
+        document.getElementById("appPage").style.display = "none";
+        document.getElementById("loginPage").style.display = "flex";
+        document.getElementById("loginUsername").value = "";
+        document.getElementById("loginPassword").value = "";
+        document.getElementById("loginMsg").innerHTML = "";
+    }
+
+    function showSection(name, el) {
+        document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+        document.getElementById(name).classList.add("active");
+        document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+        el.classList.add("active");
+        const titles = { dashboard: "Dashboard", users: "Users", projects: "Projects", tasks: "Tasks", search: "Search" };
+        document.getElementById("sectionTitle").textContent = titles[name];
+        if (name === "dashboard") loadDashboard();
+        if (name === "users") loadUsers();
+        if (name === "projects") loadProjects();
+    }
+
+    async function loadDashboard() {
+        try {
+            const usersRes = await axios.get(API + "/users", config());
+            document.getElementById("statUsers").textContent = usersRes.data.totalElements;
+            const projectsRes = await axios.get(API + "/projects", config());
+            document.getElementById("statProjects").textContent = projectsRes.data.totalElements;
+            const dueRes = await axios.get(API + "/tasks/due-today", config());
+            document.getElementById("statTasks").textContent = dueRes.data.length;
+            renderDueToday(dueRes.data);
+        } catch (err) { console.error(err); }
+    }
+
+    function renderDueToday(tasks) {
+        const el = document.getElementById("dueTodayTable");
+        if (!tasks.length) { el.innerHTML = '<div class="empty">Asnje task per sot</div>'; return; }
+        el.innerHTML = tableHtml(["ID", "Titulli", "Status", "Prioriteti"],
+            tasks.map(t => `<tr><td>${t.id}</td><td>${t.title}</td><td>${statusBadge(t.status)}</td><td>${priorityBadge(t.priority)}</td></tr>`));
+    }
+
+    async function loadUsers() {
+        try {
+            const res = await axios.get(API + "/users", config());
+            const users = res.data.content;
+            const el = document.getElementById("usersTable");
+            if (!users.length) { el.innerHTML = '<div class="empty">Asnje user</div>'; return; }
+            el.innerHTML = tableHtml(["ID", "Username", "Email", "Veprime"],
+                users.map(u => `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.email}</td><td class="actions"><button class="btn-sm btn-danger" onclick="deleteUser(${u.id})">Fshi</button></td></tr>`));
+        } catch (err) { showMsg("userMsg", "Gabim ne ngarkim", false); }
+    }
+
+    async function createUser() {
+        clearErrors(["newUsername", "newEmail", "newPassword"]);
+        const username = document.getElementById("newUsername").value.trim();
+        const email = document.getElementById("newEmail").value.trim();
+        const password = document.getElementById("newPassword").value;
+        let valid = true;
+        if (username.length < 3) { fieldError("newUsername", "Min 3 karaktere"); valid = false; }
+        if (!email.includes("@")) { fieldError("newEmail", "Email i pavlefshem"); valid = false; }
+        if (password.length < 8) { fieldError("newPassword", "Min 8 karaktere"); valid = false; }
+        if (!valid) return;
+        try {
+            await axios.post(API + "/users", { username, email, password }, config());
+            showMsg("userMsg", "User u krijua!", true);
+            document.getElementById("newUsername").value = "";
+            document.getElementById("newEmail").value = "";
+            document.getElementById("newPassword").value = "";
+            loadUsers();
+        } catch (err) { showMsg("userMsg", errMsg(err), false); }
+    }
+
+    async function deleteUser(id) {
+        if (!confirm("Fshi user-in " + id + "?")) return;
+        try { await axios.delete(API + "/users/" + id, config()); loadUsers(); }
+        catch (err) { showMsg("userMsg", errMsg(err), false); }
+    }
+
+    async function loadProjects() {
+        try {
+            const res = await axios.get(API + "/projects", config());
+            const projects = res.data.content;
+            const el = document.getElementById("projectsTable");
+            if (!projects.length) { el.innerHTML = '<div class="empty">Asnje projekt</div>'; return; }
+            el.innerHTML = tableHtml(["ID", "Emri", "Pershkrimi", "Owner", "Veprime"],
+                projects.map(p => `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.description || '-'}</td><td>${p.ownerId}</td><td class="actions"><button class="btn-sm btn-danger" onclick="deleteProject(${p.id})">Fshi</button></td></tr>`));
+        } catch (err) { showMsg("projectMsg", "Gabim ne ngarkim", false); }
+    }
+
+    async function createProject() {
+        clearErrors(["projectName", "projectOwnerId"]);
+        const name = document.getElementById("projectName").value.trim();
+        const description = document.getElementById("projectDesc").value.trim();
+        const ownerId = document.getElementById("projectOwnerId").value;
+        let valid = true;
+        if (!name) { fieldError("projectName", "Emri eshte i detyrueshem"); valid = false; }
+        if (!ownerId) { fieldError("projectOwnerId", "Owner ID i detyrueshem"); valid = false; }
+        if (!valid) return;
+        try {
+            await axios.post(API + "/projects", { name, description, ownerId: parseInt(ownerId) }, config());
+            showMsg("projectMsg", "Projekti u krijua!", true);
+            document.getElementById("projectName").value = "";
+            document.getElementById("projectDesc").value = "";
+            document.getElementById("projectOwnerId").value = "";
+            loadProjects();
+        } catch (err) { showMsg("projectMsg", errMsg(err), false); }
+    }
+
+    async function deleteProject(id) {
+        if (!confirm("Fshi projektin " + id + "?")) return;
+        try { await axios.delete(API + "/projects/" + id, config()); loadProjects(); }
+        catch (err) { showMsg("projectMsg", errMsg(err), false); }
+    }
+
+    async function createTask() {
+        clearErrors(["taskProjectId", "taskTitle"]);
+        const projectId = document.getElementById("taskProjectId").value;
+        const title = document.getElementById("taskTitle").value.trim();
+        let valid = true;
+        if (!projectId) { fieldError("taskProjectId", "Project ID i detyrueshem"); valid = false; }
+        if (!title) { fieldError("taskTitle", "Titulli i detyrueshem"); valid = false; }
+        if (!valid) return;
+        const assigneeVal = document.getElementById("taskAssigneeId").value;
+        const task = {
+            title,
+            description: document.getElementById("taskDesc").value,
+            status: document.getElementById("taskStatus").value,
+            priority: document.getElementById("taskPriority").value,
+            dueDate: document.getElementById("taskDueDate").value || null,
+            assigneeId: assigneeVal ? parseInt(assigneeVal) : null
+        };
+        try {
+            await axios.post(API + "/projects/" + parseInt(projectId) + "/tasks", task, config());
+            showMsg("taskMsg", "Task u krijua!", true);
+            document.getElementById("taskTitle").value = "";
+            document.getElementById("taskDesc").value = "";
+        } catch (err) { showMsg("taskMsg", errMsg(err), false); }
+    }
+
+    async function loadTasksByProject() {
+        const projectId = document.getElementById("loadTaskProjectId").value;
+        if (!projectId) { showMsg("taskMsg", "Vendos Project ID", false); return; }
+        currentProjectId = parseInt(projectId);
+        const status = document.getElementById("filterStatus").value;
+        let url = API + "/projects/" + currentProjectId + "/tasks";
+        if (status) url += "?status=" + status;
+        try {
+            const res = await axios.get(url, config());
+            const tasks = res.data.content;
+            const el = document.getElementById("tasksTable");
+            if (!tasks.length) { el.innerHTML = '<div class="empty">Asnje task</div>'; return; }
+            el.innerHTML = tableHtml(["ID", "Titulli", "Status", "Prioriteti", "Veprime"],
+                tasks.map(t => `<tr><td>${t.id}</td><td>${t.title}</td><td>${statusBadge(t.status)}</td><td>${priorityBadge(t.priority)}</td>
+                    <td class="actions">
+                        <button class="btn-sm btn-edit" onclick='openEditModal(${JSON.stringify(t)})'>Edito</button>
+                        <button class="btn-sm btn-danger" onclick="deleteTask(${t.id})">Fshi</button>
+                    </td></tr>`));
+        } catch (err) { showMsg("taskMsg", errMsg(err), false); }
+    }
+
+    async function deleteTask(id) {
+        if (!confirm("Fshi task-un " + id + "?")) return;
+        try { await axios.delete(API + "/tasks/" + id, config()); loadTasksByProject(); }
+        catch (err) { showMsg("taskMsg", errMsg(err), false); }
+    }
+
+    function openEditModal(task) {
+        document.getElementById("editTaskId").value = task.id;
+        document.getElementById("editTitle").value = task.title;
+        document.getElementById("editDesc").value = task.description || "";
+        document.getElementById("editStatus").value = task.status;
+        document.getElementById("editPriority").value = task.priority;
+        document.getElementById("editDueDate").value = task.dueDate || "";
+        document.getElementById("editAssigneeId").value = task.assigneeId || "";
+        document.getElementById("editMsg").innerHTML = "";
+        document.getElementById("editModal").classList.add("show");
+    }
+
+    function closeEditModal() {
+        document.getElementById("editModal").classList.remove("show");
+    }
+
+    async function saveTaskEdit() {
+        clearErrors(["editTitle"]);
+        const id = document.getElementById("editTaskId").value;
+        const title = document.getElementById("editTitle").value.trim();
+        if (!title) { fieldError("editTitle", "Titulli i detyrueshem"); return; }
+        const assigneeVal = document.getElementById("editAssigneeId").value;
+        const task = {
+            title,
+            description: document.getElementById("editDesc").value,
+            status: document.getElementById("editStatus").value,
+            priority: document.getElementById("editPriority").value,
+            dueDate: document.getElementById("editDueDate").value || null,
+            assigneeId: assigneeVal ? parseInt(assigneeVal) : null
+        };
+        try {
+            await axios.put(API + "/tasks/" + id, task, config());
+            closeEditModal();
+            loadTasksByProject();
+        } catch (err) { showMsg("editMsg", errMsg(err), false); }
+    }
+
+    async function searchTasks() {
+        const title = document.getElementById("searchTitle").value.trim();
+        const status = document.getElementById("searchStatus").value;
+        const priority = document.getElementById("searchPriority").value;
+        let url = API + "/tasks/search?";
+        const params = [];
+        if (title) params.push("title=" + encodeURIComponent(title));
+        if (status) params.push("status=" + status);
+        if (priority) params.push("priority=" + priority);
+        url += params.join("&");
+        try {
+            const res = await axios.get(url, config());
+            const tasks = res.data.content;
+            document.getElementById("searchResultInfo").textContent = "U gjeten " + res.data.totalElements + " task(e)";
+            const el = document.getElementById("searchTable");
+            if (!tasks.length) { el.innerHTML = '<div class="empty">Asnje task nuk perputhet</div>'; return; }
+            el.innerHTML = tableHtml(["ID", "Titulli", "Status", "Prioriteti"],
+                tasks.map(t => `<tr><td>${t.id}</td><td>${t.title}</td><td>${statusBadge(t.status)}</td><td>${priorityBadge(t.priority)}</td></tr>`));
+        } catch (err) {
+            document.getElementById("searchTable").innerHTML = '<div class="empty">Gabim: ' + (err.response ? err.response.status : err.message) + '</div>';
+        }
+    }
+
+    function tableHtml(headers, rows) {
+        return `<table><thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+    }
+    function statusBadge(s) {
+        const c = { TODO: "badge-todo", IN_PROGRESS: "badge-progress", COMPLETED: "badge-completed" };
+        return `<span class="badge ${c[s] || ''}">${s}</span>`;
+    }
+    function priorityBadge(p) {
+        const c = { LOW: "badge-low", MEDIUM: "badge-medium", HIGH: "badge-high" };
+        return `<span class="badge ${c[p] || ''}">${p}</span>`;
+    }
+    function showMsg(id, text, success) {
+        document.getElementById(id).innerHTML = `<div class="msg ${success ? 'msg-success' : 'msg-error'}">${text}</div>`;
+    }
+    function errMsg(err) {
+        if (err.response && err.response.data && err.response.data.message) return err.response.data.message;
+        return "Gabim: " + (err.response ? err.response.status : err.message);
+    }
+    function fieldError(inputId, message) {
+        document.getElementById(inputId).classList.add("invalid");
+        const errEl = document.getElementById("err-" + inputId);
+        if (errEl) { errEl.textContent = message; errEl.classList.add("show"); }
+    }
+    function clearErrors(inputIds) {
+        inputIds.forEach(id => {
+            document.getElementById(id).classList.remove("invalid");
+            const errEl = document.getElementById("err-" + id);
+            if (errEl) { errEl.textContent = ""; errEl.classList.remove("show"); }
+        });
+    }
+</script>
+
+</body>
+</html>

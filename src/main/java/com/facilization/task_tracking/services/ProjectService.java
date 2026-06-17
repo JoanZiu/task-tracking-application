@@ -3,6 +3,7 @@ package com.facilization.task_tracking.services;
 import com.facilization.task_tracking.dto.CreateProjectRequest;
 import com.facilization.task_tracking.dto.ProjectResponse;
 import com.facilization.task_tracking.dto.UpdateProjectRequest;
+import com.facilization.task_tracking.exception.ResourceNotFoundException;
 import com.facilization.task_tracking.models.Project;
 import com.facilization.task_tracking.models.User;
 import com.facilization.task_tracking.repositories.ProjectRepository;
@@ -27,15 +28,16 @@ public class ProjectService {
         project.setName(request.getName());
         project.setDescription(request.getDescription());
 
-        User owner = userRepository.findById(request.getOwnerId()).orElseThrow();
-        project.setOwner(owner);
+        User owner = userRepository.findById(request.getOwnerId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getOwnerId()));        project.setOwner(owner);
 
         Project saved = projectRepository.save(project);
         return mapToResponse(saved);
     }
 
     public ProjectResponse getProjectById(Long id) {
-        Project project = projectRepository.findById(id).orElseThrow();
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
         return mapToResponse(project);
     }
 
@@ -45,7 +47,8 @@ public class ProjectService {
     }
 
     public ProjectResponse updateProject(Long id, UpdateProjectRequest request) {
-        Project project = projectRepository.findById(id).orElseThrow();
+        Project project = projectRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
         project.setName(request.getName());
         project.setDescription(request.getDescription());
 
@@ -55,7 +58,7 @@ public class ProjectService {
 
     public void deleteProject(Long id) {
         if (!projectRepository.existsById(id)) {
-            throw new RuntimeException("Project not found with id: " + id);
+            throw new ResourceNotFoundException("Project not found with id: " + id);
         }
         projectRepository.deleteById(id);
     }

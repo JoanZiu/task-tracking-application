@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -36,7 +37,8 @@ public class UserController {
 
     // GET /api/users — te gjithe me pagination
     @GetMapping
-    public ResponseEntity<Page<UserResponse>> getAllUsers(Pageable pageable) {
+    public ResponseEntity<Page<UserResponse>> getAllUsers(
+            @org.springdoc.core.annotations.ParameterObject Pageable pageable) {
         Page<UserResponse> response = userService.getAllUsers(pageable);
         return ResponseEntity.ok(response);
     }
