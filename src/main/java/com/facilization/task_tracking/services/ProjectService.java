@@ -29,7 +29,8 @@ public class ProjectService {
         project.setDescription(request.getDescription());
 
         User owner = userRepository.findById(request.getOwnerId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getOwnerId()));        project.setOwner(owner);
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getOwnerId()));
+        project.setOwner(owner);
 
         Project saved = projectRepository.save(project);
         return mapToResponse(saved);
